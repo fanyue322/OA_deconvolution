@@ -43,3 +43,16 @@ for(i in 2:num)
 seurat=seurat[,-idx]
 
 
+###integrated through Liger
+library(liger)
+library(Seurat)
+library(SeuratWrappers)
+count_total=cbind(count1,count2)
+seurat=CreateSeuratObject(count_total)
+seurat@meta.data$celltype=cell
+seurat <- NormalizeData(seurat)
+seurat <- FindVariableFeatures(seurat)
+seurat <- ScaleData(seurat, split.by = "Method", do.center = FALSE)
+seurat <- RunOptimizeALS(seurat, k = 20, lambda = 5, split.by = "Method")
+seurat <- RunQuantileNorm(seurat, split.by = "Method")
+seurat <- RunUMAP(seurat, dims = 1:ncol(seurat[["iNMF"]]), reduction = "iNMF")
