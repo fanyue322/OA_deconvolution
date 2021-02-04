@@ -1,0 +1,45 @@
+library(Seurat)
+
+sc_counts=GetAssayData(seurat,slot="counts")
+sc_cell_type=seurat@meta.data[,9]
+
+  cell_type=unique(sc_cell_type)
+  pbmc=CreateSeuratObject(counts=sc_counts,project='GSE104782')
+  pbmc <- NormalizeData(pbmc)
+  all.genes <- rownames(pbmc)
+  pbmc <- ScaleData(pbmc, features = all.genes)
+  seurat_clusters=sc_cell_type
+  for(i in 1:length(cell_type))
+  {
+    seurat_clusters[which(seurat_clusters==cell_type[i])]=i
+  }
+  seurat_clusters=as.numeric(seurat_clusters)
+  
+  
+  pbmc@meta.data$seurat_clusters=sc_cell_type
+  sc_marker=c()
+  for(i in 1:length(cell_type))
+  {
+    markers<-FindMarkers(pbmc,ident.1=cell_type[i],ident.2=NULL,only.pos=TRUE,group.by='seurat_clusters')
+    markers$avg_logFC=abs(markers$avg_logFC)
+    markers=markers[order(markers$avg_logFC,decreasing=T),]
+    idx=intersect(which(markers$p_val_adj<0.05),which(markers$avg_logFC>0.25))
+    if(length(idx)>200)
+    {
+      idx=idx[1:200]
+    }
+    sc_marker=c(sc_marker,rownames(markers)[idx])
+  }
+  sc_marker=unique(sc_marker)
+  idx_gene=match(sc_marker,rownames(sc_counts))
+  signature_matrix=matrix(0,ncol=length(cell_type),nrow=length(sc_marker))
+  for(i in 1:length(cell_type))
+  {
+    idx_cell=which(pbmc@meta.data$seurat_clusters==cell_type[i])
+    tmp=as.matrix(sc_counts[idx_gene,idx_cell])
+    signature_matrix[,i]=rowSums(tmp)/length(idx_cell)
+  }
+  rownames(signature_matrix)=sc_marker
+  colnames(signature_matrix)=cell_type
+  sfile=paste0('signature_matrix_OA_',sample,'_',resolution,'_',top,'.txt')
+  write.table(signature_matrix, file=sfile,col.names=T,row.names=T,quote=F,sep="\t")
