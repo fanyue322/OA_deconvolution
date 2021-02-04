@@ -1,0 +1,68 @@
+  source('.../CIBERSORT.R')
+  result<-CIBERSORT(sfile,'bulk_array.txt', perm=1000)
+ 
+ ##permutation t test
+ library(GmAMisc)
+ data=data.frame(smpl=result[,5],group=c(idx_health,idx_OA))
+ perm.t.test(data,format='long')
+ 
+ ##find marker genes and GSEA analysis
+ library(Seurat)
+ library(clusterProfiler)
+  for(cell in c('EC','RegC','HTC','preHTC'))
+     {
+  markers=FindMarkers(seurat,min.pct=0,logfc.threshold=1,ident.1=cell,group.by='pred')
+  
+  idx=which(markers[,2]>0)
+   id <- bitr(rownames(markers)[idx],fromType = "SYMBOL",toType = "ENTREZID",OrgDb = "org.Hs.eg.db")
+ geneList=id[,2]
+ names(geneList)=as.character(geneList)
+  go_padj <- 0.05
+  up <- enrichGO(OrgDb="org.Hs.eg.db", 
+                        gene = names(geneList), #a vector of entrez gene id.
+                        pvalueCutoff = go_padj,
+                        keyType = "ENTREZID",
+                        pAdjustMethod = "BH", 
+                        qvalueCutoff = 0.2,
+                        ont = "ALL",
+                        minGSSize = 10, #minimal size of genes annotated by Ontology term for testing
+                        maxGSSize = 500, #maximal size of genes annotated for testing
+                        pool=T,
+                        readable=TRUE)#whether mapping gene ID to gen
+                        
+  kegg_padj <- 0.05
+  kegg_up <- enrichKEGG(gene = names(geneList), organism ="hsa",
+                            pvalueCutoff = kegg_padj,
+                            pAdjustMethod = "BH",
+                            qvalueCutoff =0.2,
+                            minGSSize = 3,
+                            use_internal_data=F)
+  kegg_up=as.data.frame(kegg_result)
+  
+  idx=which(markers[,2]<0)
+  id <- bitr(rownames(markers)[idx],fromType = "SYMBOL",toType = "ENTREZID",OrgDb = "org.Hs.eg.db")
+  geneList=id[,2]
+  names(geneList)=as.character(geneList)
+  go_padj <- 0.05
+  down <- enrichGO(OrgDb="org.Hs.eg.db", 
+                   gene = names(geneList), #a vector of entrez gene id.
+                   pvalueCutoff = go_padj,
+                   keyType = "ENTREZID",
+                   pAdjustMethod = "BH", 
+                   qvalueCutoff = 0.2,
+                   ont = "ALL",
+                   minGSSize = 10, #minimal size of genes annotated by Ontology term for testing
+                   maxGSSize = 500, #maximal size of genes annotated for testing
+                   pool=T,
+                   readable=TRUE)#whether mapping gene ID to gen
+  down=as.data.frame(down)
+  
+  kegg_padj <- 0.05 
+  kegg_down <- enrichKEGG(gene = names(geneList), organism ="hsa",
+                            pvalueCutoff = kegg_padj,
+                            pAdjustMethod = "BH",
+                            qvalueCutoff =0.2,
+                            minGSSize = 3,
+                            use_internal_data=F)
+  kegg_down=as.data.frame(kegg_result)
+  }
