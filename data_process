@@ -1,0 +1,59 @@
+#bulk data
+# ... represents the working dir
+
+OA_array=read.table('.../GSE57218_Non-normalized_data.txt')
+OA_matrix=OA_array[-1,]
+OA_matrix=OA_matrix[,-c(1,2)]
+probeID=OA_array[,1]
+ID_ref=OA_array[,2]
+ID_ref=as.character(ID_ref)
+ID_ref=ID_ref[-1]
+library(data.table)
+panel=fread('.../GPL6947-13512.txt',skip=31)
+panel=data.frame(panel)
+ID_panel=panel[,1]
+idx=match(ID_ref,ID_panel)
+gene=panel[idx,7]
+tmp=apply(OA_matrix,2,as.numeric)
+idx=seq(2,ncol(tmp),2)
+tmp=tmp[,-idx]
+OA_matrix=tmp
+bulk_count<-data.frame(GeneID=gene,OA_matrix)
+
+sc=read.table('.../Allcells_UMI_count.txt.gz')
+sc_count=sc[-1,]
+sc_count=sc_count[,-1]
+sc_count=as.matrix(sc_count)
+sc_count=apply(sc_count,2,as.numeric)
+rownames(sc_count)=as.character(sc[-1,1])
+name=c()
+for(i in 2:ncol(sc))
+{
+  name=c(name,as.character(sc[1,i]))
+}
+colnames(sc_count)=name
+
+keep_idx<-rowSums(sc_count>5)>10
+sc_counts <- as.data.frame(sc_count[keep_idx,])
+sc_counts <- data.frame(GeneID=rownames(sc_counts), sc_counts)
+library(readxl)
+ann<-read_excel('.../Table_Cell_quality_information_and_clustering_information.xlsx')
+sc_annot_sample=data.frame(ann)
+rownames(sc_annot_sample)<-NULL
+colnames(sc_annot_sample)[8]='cell_type1'
+table(sc_annot_sample$cell_type1)
+
+combined_data <- merge(bulk_count, sc_counts, by="GeneID")
+bulk_count <- combined_data[,c(2:ncol(bulk_count))]
+rownames(bulk_count) <- make.names(combined_data$GeneID, unique=TRUE)
+sc_counts <- combined_data[, c((ncol(bulk_count)+2):ncol(combined_data))]
+rownames(sc_counts) <- make.names(combined_data$GeneID, unique=TRUE)
+
+dim(bulk_count)
+dim(sc_counts)
+
+idx=which(is.na(sc_annot_sample$cell_type1))
+sc_annot_sample=sc_annot_sample[-idx,]
+sc_counts=sc_counts[,-idx]
+dim(sc_counts)
+sc_cell_type=sc_annot_sample$cell_type1
