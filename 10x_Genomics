@@ -1,0 +1,42 @@
+library(Seurat)
+library(SingleCellExperiment)
+library("DoubletFinder")
+counts <- Read10X(data.dir = paste0(.../outs/filtered_feature_bc_matrix") )
+ object <- CreateSeuratObject(counts, 
+                                 project = "Own", 
+                                 min.cells = 20, 
+                                 min.features = 200, 
+                                 names.delim = "\\.")
+object <- NormalizeData(object)
+    object <- FindVariableFeatures(object, selection.method = "vst", nfeatures = 2000)
+    object <- ScaleData(object)
+    object <- RunPCA(object)
+    object <- RunUMAP(object, dims = 1:num_dim)
+   sweep.res.list_kidney <- paramSweep_v3(object, PCs = 1:num_dim, sct = FALSE)
+    sweep.stats_kidney <- summarizeSweep(sweep.res.list_kidney, GT = FALSE)
+    bcmvn_kidney <- find.pK(sweep.stats_kidney)
+    annotations <- object@meta.data$ClusteringResults
+    homotypic.prop <- modelHomotypic(annotations)    ## ex: annotations <- object@meta.data$ClusteringResults
+    nExp_poi <- round(doublet_rate*nrow(object@meta.data))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+    nExp_poi.adj <- round(nExp_poi*(1-homotypic.prop))
+    
+    ## run DoubletFinder with varying classification stringencies
+    singlets <- doubletFinder_v3(object, PCs = 1:num_dim, pN = 0.25, pK = 0.09, nExp = nExp_poi, reuse.pANN = FALSE, sct = FALSE)
+  singlets_cell <- colnames(singlets)[singlets@meta.data[,5] =="Singlet"]
+ seurat <- subset(singlets, cells = singlets_cell)
+ if(species=="mouse"){mt_name <- "^Mt-"}else{mt_name <- "^MT-"}
+  seurat[["percent.mt"]] <- PercentageFeatureSet(seurat, pattern = mt_name)
+  cat(paste0("Number of mitochondria genes: ", sum(grepl(mt_name,rownames(seurat))), "\n"))
+   seurat <- subset(seurat, subset = nFeature_RNA > 500 & nFeature_RNA < 2000)
+  seurat <- subset(seurat, subset = nCount_RNA < 20000)
+  seurat <- subset(seurat, subset = percent.mt < 3)
+  
+  seurat <- NormalizeData(seurat, normalization.method = "LogNormalize", scale.factor = 1e4)
+  seurat <- FindVariableFeatures(seurat, 
+                                 selection.method = "vst", 
+                                 nfeatures = 2000)
+ seurat <- ScaleData(seurat, vars.to.regress = "percent.mt")
+  
+  seurat <- RunPCA(seurat, 
+                   features = VariableFeatures(object = seurat))
+   
