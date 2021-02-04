@@ -1,0 +1,45 @@
+library(SingleR)
+library(scRNAseq)
+
+reference <- SingleCellExperiment(
+    assays = list(counts = sc_count), 
+    colData = ann
+  )
+  
+   libsizes <- colSums(sc_count)
+  size.factors <- libsizes/mean(libsizes)
+  logcounts(reference) <- log2(t(t(sc_count)/size.factors) + 1)
+  
+   counts=GetAssayData(object=seurat,slot='counts')
+  
+  sce <- SingleCellExperiment(
+    assays = list(counts = counts), 
+    colData = colnames(counts)
+  )
+  libsizes <- colSums(counts)
+  size.factors <- libsizes/mean(libsizes)
+  logcounts(sce) <- log2(t(t(counts)/size.factors) + 1)
+  reference$labels=reference@colData$Cluster
+  pred <- SingleR(test=sce, ref=reference, labels=reference$labels)
+  pred_labels <- pred$labels
+  
+seurat=FindClusters(seurat,resolution=1)
+seurat@meta.data$pred=pred_labels
+num=length(unique(seurat@meta.data[,8]))
+celltype=c()
+for(i in 0:(num-1))
+{
+  idx=which(seurat@meta.data[,8]==i)
+  tmp=table(seurat@meta.data[idx,7])
+  tmp=names(tmp)[which(tmp==max(tmp))]
+  celltype=c(celltype,tmp)
+}
+
+idx=intersect(which(seurat@meta.data[,8]==0),which(seurat@meta.data[,7]!=celltype[1]))
+for(i in 2:num)
+{
+  idx=c(idx,intersect(which(seurat@meta.data[,8]==(i-1)),which(seurat@meta.data[,7]!=celltype[i])))
+}
+seurat=seurat[,-idx]
+
+
